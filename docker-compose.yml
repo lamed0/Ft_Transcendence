@@ -3,7 +3,7 @@ services:
     build: ./back-end
     container_name: backend
     ports:
-      - "3001:3000"
+      - "3000:3000"
 
 volumes:
   pgdata:
