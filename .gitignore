@@ -1,8 +1,8 @@
 # Dependencies
-./back-end/node_modules/
+back-end/node_modules/
 
 # Build output
-./back-end/dist/
+back-end/dist/
 /coverage/
 /.cache/
 /.tmp/
