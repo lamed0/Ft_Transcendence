@@ -1,0 +1,102 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Add your models here
+enum GameMode {
+  ONEVONE_QUEUE
+  ONEVONE_INVITE
+}
+
+enum GameStatus {
+  WAITING
+  LIVE
+  FINISHED
+  CANCELED
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum ParticipantRole {
+  PLAYER
+  SPECTATOR
+}
+
+model GameSession {
+  id         String     @id @default(uuid())
+  mode       GameMode
+  status     GameStatus @default(WAITING)
+
+  hostUserId Int?
+  offlineP1 String?
+  offlineP2 String?     
+
+  createdAt  DateTime @default(now())
+  startedAt  DateTime?
+  endedAt    DateTime?
+
+  scoreA     Int @default(0)
+  scoreB     Int @default(0)
+
+  participants GameParticipant[]
+
+  @@index([status])
+  @@index([mode])
+  @@index([hostUserId])
+}
+
+model GameParticipant {
+  id        String @id @default(uuid())
+  sessionId String
+  userId    Int
+  role      ParticipantRole @default(PLAYER)
+
+  joinedAt  DateTime @default(now())
+  
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@index([userId])
+}
+
+model GameInvite {
+  id         String       @id @default(uuid())
+  fromUserId Int
+  toUserId   Int
+  status     InviteStatus @default(PENDING)
+
+  createdAt  DateTime @default(now())
+  respondedAt DateTime?
+  sessionId  String?
+
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([status])
+}
+
+model MatchmakingTicket {
+  id        String   @id @default(uuid())
+  userId    Int      @unique
+  status    String   @default("SEARCHING") // SEARCHING | MATCHED | CANCELED
+
+  createdAt DateTime @default(now())
+  sessionId String?
+  matchedAt DateTime?
+
+
+  @@index([status])
+  @@index([createdAt])
+}

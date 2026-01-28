@@ -12,9 +12,9 @@ export declare class AuthService {
     constructor(jwtService: JwtService, prisma: DatabaseService, mailService: MailService);
     validateUser({ username, password }: AuthPayloadDto): Promise<{
         user: {
+            email: string | null;
             username: string;
             id: number;
-            email: string | null;
             avatarUrl: string | null;
             status: import(".prisma/client").$Enums.userStatus;
             createdAt: Date;
@@ -27,9 +27,9 @@ export declare class AuthService {
     }>;
     refreshTokens(userId: number, refreshToken: string): Promise<{
         user: {
+            email: string | null;
             username: string;
             id: number;
-            email: string | null;
             avatarUrl: string | null;
             status: import(".prisma/client").$Enums.userStatus;
             createdAt: Date;
@@ -39,10 +39,10 @@ export declare class AuthService {
     logout(userId: number): Promise<void>;
     private signToken;
     validateGoogleUser(googleUser: GoogleDto): Promise<{
-        username: string;
-        password: string | null;
-        id: number;
         email: string | null;
+        password: string | null;
+        username: string;
+        id: number;
         googleId: string | null;
         ftId: number | null;
         avatarUrl: string | null;
@@ -55,9 +55,9 @@ export declare class AuthService {
     }>;
     googleLogin(googleUser: GoogleDto): Promise<{
         user: {
+            email: string | null;
             username: string;
             id: number;
-            email: string | null;
             avatarUrl: string | null;
             status: import(".prisma/client").$Enums.userStatus;
             createdAt: Date;
@@ -65,10 +65,10 @@ export declare class AuthService {
         accessToken: string;
     }>;
     validateFtUser(ftUser: FtDto): Promise<{
-        username: string;
-        password: string | null;
-        id: number;
         email: string | null;
+        password: string | null;
+        username: string;
+        id: number;
         googleId: string | null;
         ftId: number | null;
         avatarUrl: string | null;
@@ -81,9 +81,9 @@ export declare class AuthService {
     }>;
     ftLogin(ftUser: FtDto): Promise<{
         user: {
+            email: string | null;
             username: string;
             id: number;
-            email: string | null;
             avatarUrl: string | null;
             status: import(".prisma/client").$Enums.userStatus;
             createdAt: Date;

@@ -1,0 +1,88 @@
+Folder map of /home/s1m0x00/Desktop/pingpong/backend/src
+==================================================
+
+├── auth/
+│   ├── config/
+│   │   ├── ft-oauth.config.ts
+│   │   ├── google-oauth.config.ts
+│   │   └── jwt.config.ts
+│   ├── dto/
+│   │   ├── auth.dto.ts
+│   │   ├── ft.dto.ts
+│   │   ├── google.dto.ts
+│   │   ├── register.dto.ts
+│   │   └── resend-verification.dto.ts
+│   ├── guards/
+│   │   ├── ft-auth/
+│   │   │   ├── ft-auth.guard.spec.ts
+│   │   │   └── ft-auth.guard.ts
+│   │   ├── google-auth/
+│   │   │   ├── google-auth.guard.spec.ts
+│   │   │   └── google-auth.guard.ts
+│   │   ├── jwt.guard.ts
+│   │   ├── local.guard.ts
+│   │   └── refresh.guard.ts
+│   ├── strategies/
+│   │   ├── ft.strategy.ts
+│   │   ├── google.strategy.ts
+│   │   ├── jwt.strategy.ts
+│   │   ├── local.strategy.ts
+│   │   └── refresh.strategy.ts
+│   ├── utils/
+│   │   └── token.ts
+│   ├── auth.controller.spec.ts
+│   ├── auth.controller.ts
+│   ├── auth.module.ts
+│   ├── auth.service.spec.ts
+│   └── auth.service.ts
+├── common/
+│   └── decorators/
+│       └── public.decorator.ts
+├── database/
+│   ├── database.module.ts
+│   ├── database.service.spec.ts
+│   └── database.service.ts
+├── friends/
+│   ├── utils/
+│   │   └── friends.utils.ts
+│   ├── friends.controller.spec.ts
+│   ├── friends.controller.ts
+│   ├── friends.module.ts
+│   ├── friends.service.spec.ts
+│   └── friends.service.ts
+├── game/
+│   ├── dto/
+│   │   ├── create-coop.dto.ts
+│   │   ├── invite.dto.ts
+│   │   └── result.dto.ts
+│   ├── invite/
+│   │   └── invite.service.ts
+│   ├── matchmaking/
+│   │   └── matchmaking.service.ts
+│   ├── permission/
+│   │   └── permission.service.ts
+│   ├── realtime/
+│   │   ├── game.gateway.ts
+│   │   └── socket-auth.guard.ts
+│   ├── game.controller.spec.ts
+│   ├── game.controller.ts
+│   ├── game.module.ts
+│   ├── game.service.spec.ts
+│   └── game.service.ts
+├── mail/
+│   ├── mail.module.ts
+│   ├── mail.service.spec.ts
+│   └── mail.service.ts
+├── users/
+│   ├── dto/
+│   │   └── update-profile.dto.ts
+│   ├── users.controller.spec.ts
+│   ├── users.controller.ts
+│   ├── users.module.ts
+│   ├── users.service.spec.ts
+│   └── users.service.ts
+├── app.controller.spec.ts
+├── app.controller.ts
+├── app.module.ts
+├── app.service.ts
+└── main.ts

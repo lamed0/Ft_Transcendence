@@ -32,9 +32,9 @@ export declare class AuthController {
     }>;
     refresh(req: AuthenticatedRequest): Promise<{
         user: {
+            email: string | null;
             username: string;
             id: number;
-            email: string | null;
             avatarUrl: string | null;
             status: import(".prisma/client").$Enums.userStatus;
             createdAt: Date;

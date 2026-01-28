@@ -12,13 +12,17 @@ const game_controller_1 = require("./game.controller");
 const game_service_1 = require("./game.service");
 const permission_service_1 = require("./permission/permission.service");
 const database_service_1 = require("../database/database.service");
+const invite_service_1 = require("./invite/invite.service");
+const game_gateway_1 = require("./realtime/game.gateway");
+const jwt_1 = require("@nestjs/jwt");
+const matchmaking_service_1 = require("./matchmaking/matchmaking.service");
 let GameModule = class GameModule {
 };
 exports.GameModule = GameModule;
 exports.GameModule = GameModule = __decorate([
     (0, common_1.Module)({
         controllers: [game_controller_1.GameController],
-        providers: [game_service_1.GameService, permission_service_1.PermissionService, database_service_1.DatabaseService]
+        providers: [game_service_1.GameService, permission_service_1.PermissionService, database_service_1.DatabaseService, invite_service_1.InvitesService, game_gateway_1.GameGateway, jwt_1.JwtService, matchmaking_service_1.MatchmakingService]
     })
 ], GameModule);
 //# sourceMappingURL=game.module.js.map

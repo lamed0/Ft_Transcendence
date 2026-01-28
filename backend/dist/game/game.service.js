@@ -12,10 +12,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.GameService = void 0;
 const common_1 = require("@nestjs/common");
 const database_service_1 = require("../database/database.service");
+const permission_service_1 = require("./permission/permission.service");
 let GameService = class GameService {
     prisma;
-    constructor(prisma) {
+    permissions;
+    constructor(prisma, permissions) {
         this.prisma = prisma;
+        this.permissions = permissions;
     }
     async submitResult(sessionId, userId, dto) {
         const session = await this.prisma.gameSession.findUnique({
@@ -53,10 +56,33 @@ let GameService = class GameService {
             },
         });
     }
+    async getFriendActiveSession(myId, friendId) {
+        const areFriends = await this.permissions.areFriends(myId, friendId);
+        if (!areFriends)
+            throw new common_1.ForbiddenException('Not friends');
+        const session = await this.prisma.gameSession.findFirst({
+            where: {
+                status: { in: ['WAITING', 'LIVE'] },
+                participants: {
+                    some: {
+                        role: 'PLAYER',
+                        userId: friendId,
+                    },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true, status: true, mode: true },
+        });
+        return {
+            sessionId: session?.id ?? null,
+            status: session?.status ?? null,
+            mode: session?.mode ?? null,
+        };
+    }
 };
 exports.GameService = GameService;
 exports.GameService = GameService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [database_service_1.DatabaseService])
+    __metadata("design:paramtypes", [database_service_1.DatabaseService, permission_service_1.PermissionService])
 ], GameService);
 //# sourceMappingURL=game.service.js.map

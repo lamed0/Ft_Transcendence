@@ -1,28 +1,94 @@
-services:
-  back-end:
-    build: ./backend
-    container_name: backend
-    env_file:
-      - ./backend/.env
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
-    depends_on:
-      - postgres
+# services:
+#   back-end:
+#     build: ./backend
+#     container_name: backend
+#     env_file:
+#       - ./backend/.env
+#     ports:
+#       - "3000:3000"
+#     volumes:
+#       - ./backend:/app
+#       - /app/node_modules
+#     depends_on:
+#       - postgres
 
+#   postgres:
+#     image: postgres:16
+#     container_name: transcendence-db
+#     restart: always
+#     env_file:
+#       - ./backend/.env
+#     ports:
+#       - "5433:5432"
+#     volumes:
+#       - postgres_data:/var/lib/postgresql/data
+
+#   adminer:
+#     image: adminer:latest
+#     container_name: adminer
+#     restart: always
+#     ports:
+#       - "8080:8080"
+#     depends_on:
+#       - postgres
+
+
+# volumes:
+#   postgres_data:
+
+
+services:
   postgres:
     image: postgres:16
-    container_name: transcendence-db
+    container_name: transcendence
     restart: always
     env_file:
-      - ./backend/.env
+      - ./micro/db/.env
     ports:
       - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_micro_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
 
+  adminer:
+    image: adminer:latest
+    container_name: adminer
+    restart: always
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  gateway:
+    build:
+      context: ./micro
+      dockerfile: ./apps/gateway/Dockerfile
+    container_name: gateway
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./micro/apps/gateway/.env
+
+  auth:
+    build:
+      context: ./micro
+      dockerfile: ./apps/auth/Dockerfile
+    container_name: auth
+    restart: always
+    env_file:
+      - ./micro/apps/auth/.env
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
 
 volumes:
-  postgres_data:
+  postgres_micro_data:
