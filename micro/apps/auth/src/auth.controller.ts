@@ -1,13 +1,16 @@
 import { Body, Controller, Get, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LocalGuard } from './guards/local.guard';
-import { JwtAuthGuard } from './guards/jwt.guard';
+import { LocalGuard } from '../../../libs/common/guards/local.guard';
+import { JwtAuthGuard } from '../../../libs/common/guards/jwt.guard';
 import type { Request, Response } from 'express';
 import { RegisterDto } from './dto/register.dto';
-import { RefreshGuard } from './guards/refresh.guard';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { RefreshGuard } from '../../../libs/common/guards/refresh.guard';
 import { Public } from '../../../libs/common/public.decorator';
-import { GoogleAuthGuard } from './guards/google-auth/google-auth.guard';
-import { FtAuthGuard } from './guards/ft-auth/ft-auth.guard';
+import { RateLimit } from './decorators/rate-limit.decorator';
+import { RateLimitGuard } from '../../../libs/common/guards/rate-limit.guard';
+import { GoogleAuthGuard } from '../../../libs/common/guards/google-auth/google-auth.guard';
+import { FtAuthGuard } from '../../../libs/common/guards/ft-auth/ft-auth.guard';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 
 interface AuthenticatedRequest extends Request {
@@ -19,7 +22,8 @@ export class AuthController {
 
     constructor( private authService: AuthService) {}
     
-    @UseGuards(LocalGuard)
+    @RateLimit({ max: 5, windowMs: 900000 }) // 5 requests per 15 minutes
+    @UseGuards(LocalGuard, RateLimitGuard)
     @Post('login')
     async login(@Req() req: AuthenticatedRequest){
         return req.user;
@@ -36,6 +40,16 @@ export class AuthController {
         return req.user;
     }
 
+    @RateLimit({ max: 5, windowMs: 3600000 }) // 5 requests per hour
+    @UseGuards(JwtAuthGuard, RateLimitGuard)
+    @Post('change-password')
+    async changePassword(@Req() req: AuthenticatedRequest, @Body() dto: ChangePasswordDto) {
+        return this.authService.changePassword(req.user.id, dto.oldPassword, dto.newPassword, dto.confirmPassword);
+    }
+
+    @Public()
+    @RateLimit({ max: 3, windowMs: 3600000 }) // 3 requests per hour
+    @UseGuards(RateLimitGuard)
     @Post('register')
     async register(@Body() dto: RegisterDto){
         return this.authService.register(dto);
@@ -80,7 +94,7 @@ export class AuthController {
         }
         
         const response = await this.authService.googleLogin(req.user);
-        return res.redirect(`http://localhost:5173/oauth?token=${response.accessToken}`);
+        return res.redirect(`http://localhost:5173/home?token=${response.accessToken}`);
     }
 
 
@@ -98,7 +112,7 @@ export class AuthController {
         }
         
         const response = await this.authService.ftLogin(req.user);
-        return res.redirect(`http://localhost:5173/oauth?token=${response.accessToken}`);
+        return res.redirect(`http://localhost:5173/home?token=${response.accessToken}`);
     }
 
 }

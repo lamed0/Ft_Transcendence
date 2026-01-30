@@ -23,9 +23,10 @@ up-detached:
 down:
 	@$(DOCKER_COMPOSE) down
 
-# Full clean: stop containers, remove networks
+# Full clean: stop containers, remove networks and volumes
 fclean: down
 	@rm -rf $(DATA_PATH)
+	@docker volume rm pingpong_postgres_micro_data 2>/dev/null || true
 	@echo "All volume data removed!"
 	@docker network prune -f
 

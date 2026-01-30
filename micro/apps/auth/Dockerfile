@@ -9,9 +9,6 @@ COPY . .
 # Install dependencies
 RUN npm install
 
-# Copy Prisma schema for auth service
-COPY apps/auth/prisma ./apps/auth/prisma
-
 # Generate Prisma client
 RUN npx prisma generate --schema=./apps/auth/prisma/schema.prisma
 

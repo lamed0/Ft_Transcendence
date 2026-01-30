@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { AuthDatabaseService } from './auth-database.service';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { DatabaseModule } from '../../../libs/database';
 import { RefreshStrategy } from './strategies/refresh.strategy';
 import { ConfigModule } from '@nestjs/config';
 import googleOauthConfig from './config/google-oauth.config';
@@ -16,6 +16,8 @@ import ftOauthConfig from './config/ft-oauth.config';
 import { FtStrategy } from './strategies/ft.strategy';
 import { MailService } from '../../../apps/mail/src/mail.service';
 import { MailModule } from '../../../apps/mail/src/mail.module';
+import { UsersModule } from './users.module';
+import { RedisModule } from 'libs/common/src/redis/redis.module';
 
 @Module({
   imports: [
@@ -24,7 +26,8 @@ import { MailModule } from '../../../apps/mail/src/mail.module';
       envFilePath: 'apps/auth/.env',
     }),
     MailModule,
-    DatabaseModule,
+    UsersModule,
+    RedisModule,
     PassportModule,
     JwtModule.registerAsync({
     imports: [ConfigModule],
@@ -41,6 +44,6 @@ import { MailModule } from '../../../apps/mail/src/mail.module';
 
   ],
   controllers: [AuthController],
-  providers: [AuthService, LocalStrategy, JwtStrategy, RefreshStrategy, GoogleStrategy, FtStrategy, MailService]
+  providers: [AuthService, AuthDatabaseService, LocalStrategy, JwtStrategy, RefreshStrategy, GoogleStrategy, FtStrategy, MailService]
 })
 export class AuthModule {}

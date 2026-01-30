@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, HttpException, HttpStatus, Inje
 import { AuthPayloadDto } from './dto/auth.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { DatabaseService } from '../../../libs/database/database.service';
+import { AuthDatabaseService } from './auth-database.service';
 import * as bcrypt from 'bcrypt'; 
 import { RegisterDto } from './dto/register.dto';
 import { GoogleDto } from './dto/google.dto';
@@ -15,7 +15,7 @@ import { createHash } from 'crypto';
 export class AuthService {
     constructor ( 
         private jwtService: JwtService, 
-        private prisma: DatabaseService, 
+        private prisma: AuthDatabaseService, 
         private mailService: MailService,
         private configService: ConfigService,
     ) {}
@@ -127,7 +127,20 @@ export class AuthService {
         const user = await this.prisma.users.findFirst({
             where: {email: googleUser.email},
         });
-        if (user) return user;
+        if (user) {
+            // Check if trying to link a different Google account
+            if (user.googleId && user.googleId !== googleUser.googleId) {
+                throw new ConflictException('This email is already linked to a different Google account');
+            }
+            // If user exists but no googleId, link the new Google account
+            if (!user.googleId) {
+                return await this.prisma.users.update({
+                    where: {id: user.id},
+                    data: { googleId: googleUser.googleId, avatarUrl: googleUser.avatarUrl, status: 'ONLINE', isEmailVerified: true},
+                });
+            }
+            return user;
+        }
         return await this.prisma.users.create({
             data: {
                 email: googleUser.email,
@@ -151,6 +164,11 @@ export class AuthService {
             where: {email: ftUser.email},
         });
         if (user){
+            // Check if trying to link a different 42 account
+            if (user.ftId && user.ftId !== ftUser.ftId) {
+                throw new ConflictException('This email is already linked to a different 42 account');
+            }
+            // If user exists but no ftId, link the new 42 account
             if (!user.ftId){
                 return this.prisma.users.update({
                     where: {id: user.id},
@@ -289,5 +307,36 @@ export class AuthService {
         await this.mailService.sendVerificationMail(user.email!, link);
 
         return { message: 'If that email exists, a verification email has been sent.' };
+    }
+
+    async changePassword(userId: number, oldPassword: string, newPassword: string, confirmPassword: string) {
+        if (newPassword !== confirmPassword) {
+            throw new BadRequestException('Passwords do not match');
+        }
+
+        const user = await this.prisma.users.findUnique({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new BadRequestException('User not found');
+        }
+
+        if (!user.password) {
+            throw new BadRequestException('This account uses OAuth login and does not have a password');
+        }
+
+        const isValid = await bcrypt.compare(oldPassword, user.password);
+        if (!isValid) {
+            throw new UnauthorizedException('Current password is incorrect');
+        }
+
+        const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+        await this.prisma.users.update({
+            where: { id: userId },
+            data: { password: hashedNewPassword },
+        });
+
+        return { message: 'Password changed successfully' };
     }
 }

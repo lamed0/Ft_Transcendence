@@ -90,5 +90,39 @@ services:
     depends_on:
       - postgres
 
+  # game:
+  #   build:
+  #     context: ./micro
+  #     dockerfile: ./apps/game/Dockerfile
+  #   container_name: game
+  #   restart: always
+  #   env_file:
+  #     - ./micro/apps/game/.env
+  #   ports:
+  #     - "3002:3002"
+  #   depends_on:
+  #     - postgres
+
+  friends:
+    build:
+      context: ./micro
+      dockerfile: ./apps/friends/Dockerfile
+    container_name: friends
+    restart: always
+    env_file:
+      - ./micro/apps/friends/.env
+    ports:
+      - "3003:3003"
+    depends_on:
+      - postgres
+
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    restart: always
+
 volumes:
   postgres_micro_data:
