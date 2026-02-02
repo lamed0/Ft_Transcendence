@@ -7,7 +7,7 @@ async function bootstrap() {
 
   // Enable CORS
   app.enableCors({
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+    origin: process.env.FRONTEND_URL ?? 'http://localhost:5173',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -52,7 +52,7 @@ async function bootstrap() {
 
   // API prefix routes (for frontend via vite proxy)
   app.use('/api/auth', createProxyMiddleware({
-    target: process.env.AUTH_SERVICE_URL ?? 'http://localhost:3001',
+    target: process.env.AUTH_SERVICE_URL ?? 'http://auth:3001',
     changeOrigin: true,
     pathRewrite: {
       '^/api/auth': '/auth',
@@ -60,7 +60,7 @@ async function bootstrap() {
   }));
 
   app.use('/api/users', createProxyMiddleware({
-    target: process.env.AUTH_SERVICE_URL ?? 'http://localhost:3001',
+    target: process.env.AUTH_SERVICE_URL ?? 'http://auth:3001',
     changeOrigin: true,
     pathRewrite: {
       '^/api/users': '/users',
@@ -68,7 +68,7 @@ async function bootstrap() {
   }));
 
   app.use('/api/friends', createProxyMiddleware({
-    target: process.env.FRIENDS_SERVICE_URL ?? 'http://localhost:3003',
+    target: process.env.FRIENDS_SERVICE_URL ?? 'http://friends:3003',
     changeOrigin: true,
     pathRewrite: {
       '^/api/friends': '/friends',
@@ -76,7 +76,7 @@ async function bootstrap() {
   }));
 
   app.use('/api/game', createProxyMiddleware({
-    target: process.env.GAME_SERVICE_URL ?? 'http://localhost:3004',
+    target: process.env.GAME_SERVICE_URL ?? 'http://game:3004',
     changeOrigin: true,
     pathRewrite: {
       '^/api/game': '/game',

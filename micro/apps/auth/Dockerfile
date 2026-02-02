@@ -9,6 +9,9 @@ COPY . .
 # Install dependencies
 RUN npm install
 
+# Install Prisma CLI v5 globally for team access
+RUN npm install -g prisma@5
+
 # Generate Prisma client
 RUN npx prisma generate --schema=./apps/auth/prisma/schema.prisma
 

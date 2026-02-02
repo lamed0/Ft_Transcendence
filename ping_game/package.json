@@ -1,0 +1,35 @@
+{
+  "name": "learn_babylonsjs",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "build": "webpack",
+    "start": "webpack-dev-server --port 8080 --live-reload",
+    "server": "node src/game_server.js",
+    "dev": "npm run server & npm run start "
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.5",
+    "@babylonjs/core": "^8.27.2",
+    "@babylonjs/inspector": "^8.27.2",
+    "html-webpack-plugin": "^5.6.4",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.2",
+    "webpack": "^5.101.3",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.2"
+  },
+  "dependencies": {
+    "@babylonjs/gui": "^8.46.2",
+    "@babylonjs/loaders": "^8.46.2",
+    "@types/earcut": "^3.0.0",
+    "babylonjs-gltf2interface": "^8.46.1",
+    "earcut": "^3.0.2",
+    "run": "^1.5.0",
+    "ws": "^8.19.0"
+  }
+}

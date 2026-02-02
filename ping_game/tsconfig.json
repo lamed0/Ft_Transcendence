@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "outDir": "dist",
+    "target": "es6",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    // "strict": true,
+    "noResolve": false,
+    "noImplicitAny": false,
+    "sourceMap": true,
+    "preserveConstEnums": true,
+    "lib": [
+      "dom",
+      "es6",
+      "dom.iterable"
+    ],
+    "rootDir": "src"
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "webpack.config.cjs",
+    "node_modules",
+    "dist"
+  ]
+}

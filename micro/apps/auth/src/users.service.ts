@@ -10,7 +10,7 @@ export class UsersService {
     async me(userId: number){
          const user = await this.prisma.users.findUnique({
             where: {id: userId},
-            select: { id: true, username: true, avatarUrl: true, status: true },
+            select: { id: true, username: true, avatarUrl: true, status: true, level: true },
          });
          if (!user) throw new NotFoundException("User not found");
         return user;
@@ -19,7 +19,7 @@ export class UsersService {
     async getById(id: number){
         const user = await this.prisma.users.findUnique({
             where: { id },
-            select: { id: true, username: true, avatarUrl: true, status: true },
+            select: { id: true, username: true, avatarUrl: true, status: true, level: true },
         });
         if(!user) throw new NotFoundException("User not Found");
         return user;
@@ -39,7 +39,7 @@ export class UsersService {
                 data: {
                     ...(dto.username ? { username: dto.username } : {}),
                 },
-                select: { id: true , username: true, status: true, avatarUrl: true },
+                select: { id: true , username: true, status: true, avatarUrl: true, level: true },
             });
         }catch(e: any){
             if(e?.code == "P2025") throw new NotFoundException("User Not Found");
@@ -70,7 +70,16 @@ export class UsersService {
     async getUsersPublicBatch(ids: number[]){
         return this.prisma.users.findMany({
             where: { id: { in: ids } },
-            select: { id: true, avatarUrl: true, username: true, status: true },
+            select: { id: true, avatarUrl: true, username: true, status: true, level: true },
         });
     }
+
+    async setStatusBatch(ids: number[], status: 'ONLINE'|'OFFLINE'|'IN_GAME') {
+    await this.prisma.users.updateMany({
+        where: { id: { in: ids } },
+        data: { status },
+    });
+    return { updated: ids.length };
+    }
+
 }

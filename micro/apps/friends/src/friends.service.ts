@@ -93,6 +93,41 @@ export class FriendsService {
             },
             orderBy: { updatedAt: 'desc'},
         });
-        return rows.map((r) => (r.userLowId === meId? r.userHighId : r.userLowId));
+        const friendIds = rows.map((r) => (r.userLowId === meId? r.userHighId : r.userLowId));
+        const friendsWithDetails = await this.userClient.batch(friendIds);
+        return friendsWithDetails.sort((a, b) => {
+            const aIdx = friendIds.indexOf(a.id);
+            const bIdx = friendIds.indexOf(b.id);
+            return aIdx - bIdx;
+        });
+    }
+
+    async areFriends(userA: number, userB: number){
+        if (userA === userB) return true;
+
+        const low = Math.min(userA, userB);
+        const high = Math.max(userA, userB);
+
+        const fr = await this.prisma.friends.findUnique({
+            where: { userLowId_userHighId: { userLowId: low, userHighId: high } },
+            select: { status: true },
+        });
+
+        return fr?.status === 'ACCEPTED';
+    }
+
+    async anyAccepted(userId: number, otherIds: number[]): Promise<Boolean>{
+        if (otherIds.length === 0) return false;
+
+        const fr = await this.prisma.friends.findFirst({
+            where: { status: 'ACCEPTED',
+                OR: [
+                    { userLowId: userId, userHighId: { in: otherIds }},
+                    { userHighId: userId, userLowId: { in : otherIds}},
+                ],
+            },
+            select: { id: true},
+        });
+        return !!fr; //if theres friends it return true else false
     }
 }

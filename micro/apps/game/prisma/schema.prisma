@@ -3,7 +3,7 @@
 
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["debian-openssl-1.1.x"]
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -42,7 +42,11 @@ model GameSession {
 
   hostUserId Int?
   offlineP1 String?
-  offlineP2 String?     
+  offlineP2 String?
+  
+  // Player levels at time of game
+  playerALevel Int?
+  playerBLevel Int?
 
   createdAt  DateTime @default(now())
   startedAt  DateTime?

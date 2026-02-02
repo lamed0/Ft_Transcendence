@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { GameGateway } from '../realtime/game.gateway';
 import { GameDatabaseService } from '../game-database.service';
+import { UsersClient } from '../clients/users.client';
 
 type JoinQueueResult =
   | { status: 'SEARCHING' }
@@ -11,6 +12,7 @@ export class MatchmakingService {
   constructor(
     private prisma: GameDatabaseService,
     private gateway: GameGateway,
+    private userClient: UsersClient
   ) {}
 
     async joinQueue(userId: number): Promise<JoinQueueResult> {
@@ -68,30 +70,24 @@ export class MatchmakingService {
         },
         });
 
-        // Fetch player info
-        const player1 = await tx.users.findUnique({
-            where: { id: userId },
-            select: { id: true, username: true, avatarUrl: true },
-        });
-        const player2 = await tx.users.findUnique({
-            where: { id: p.userId },
-            select: { id: true, username: true, avatarUrl: true },
-        });
-
-        if (!player1 || !player2) return null;
-
-        return { 
-            sessionId: session.id, 
-            players: [player1, player2]
-        };
+        return { sessionId: session.id, playerIds: [userId, p.userId] };
     });
 
     if (!match) return { status: 'SEARCHING' };
+    
+    // Fetch player info
+    const users = await this.userClient.batch(match.playerIds);
+
+    // Keep same order as playerIds
+    const byId = new Map(users.map((u) => [u.id, u]));
+    const players = match.playerIds
+        .map((id) => byId.get(id))
+        .filter(Boolean)
+        .map((u) => ({ id: u!.id, username: u!.username, avatarUrl: u!.avatarUrl }));
 
     // 5) push notify both users via WS (no polling)
-    this.gateway.notifyMatched(match.players.map(p => p.id), match.sessionId);
-
-    return { status: 'MATCHED', sessionId: match.sessionId, players: match.players };
+    this.gateway.notifyMatched(match.playerIds, match.sessionId);
+    return { status: 'MATCHED', sessionId: match.sessionId, players };
     }
 
   async leaveQueue(userId: number) {

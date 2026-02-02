@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { AuthPayloadDto } from './dto/auth.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -10,6 +10,7 @@ import { FtDto } from './dto/ft.dto';
 import { MailService } from '../../../apps/mail/src/mail.service';
 import { makeEmailVerifyToken } from './utils/token';
 import { createHash } from 'crypto';
+import { NotFoundError } from 'rxjs';
 
 @Injectable()
 export class AuthService {
@@ -24,15 +25,15 @@ export class AuthService {
         const user = await this.prisma.users.findUnique({
             where: { username },
         });
-        if (!user) return null;
-        if (!user.password) throw new UnauthorizedException('This account uses Google login');
+        if (!user) throw new UnauthorizedException('Invalid username');
+        if (!user.password) throw new UnauthorizedException('This account uses Google or 42 login');
 
         if (!user.isEmailVerified) {
             throw new UnauthorizedException('Please verify your email before logging in.');
         }
 
         const isValid = await bcrypt.compare(password, user.password);
-        if (!isValid) return null;
+        if (!isValid) throw new UnauthorizedException('Invalid password');
 
         const update = await this.prisma.users.update({
             where: { id: user.id },
@@ -69,7 +70,9 @@ export class AuthService {
                 expiresAt: new Date(Date.now() + 30 * 60  * 1000),
             },
         });
-        const link = `${process.env.FRONT_URL}/auth/verify-email?token=${raw}`;
+        // Use backend API URL for verification, not frontend
+        const backendUrl = process.env.API_URL || 'http://localhost:3001';
+        const link = `${backendUrl}/auth/verify-email?token=${raw}`;
         try{
             await this.mailService.sendVerificationMail(user.email!, link);
             console.log('Verification email sent successfully to:', user.email);
@@ -249,18 +252,18 @@ export class AuthService {
         throw new BadRequestException('Invalid or expired token');
     }
 
-    await this.prisma.$transaction([
-        this.prisma.users.update({
+    const user = await this.prisma.users.update({
         where: { id: tokenRow.userId },
-        data: { isEmailVerified: true },
-        }),
-        this.prisma.email_token.update({
+        data: { isEmailVerified: true, status: 'ONLINE' },
+    });
+
+    await this.prisma.email_token.update({
         where: { id: tokenRow.id },
         data: { usedAt: new Date() },
-        }),
-    ]);
+    });
 
-    return { message: 'Email verified successfully. You can now log in.' };
+    // Auto-login user with tokens
+    return this.signTokenWithUser(user.id);
     }
 
     async resendVef(email: string){
@@ -302,7 +305,9 @@ export class AuthService {
             },
         });
 
-        const link = `${process.env.FRONT_URL}/auth/verify-email?token=${raw}`;
+        // Use backend API URL for verification, not frontend
+        const backendUrl = process.env.API_URL || 'http://localhost:3001';
+        const link = `${backendUrl}/auth/verify-email?token=${raw}`;
 
         await this.mailService.sendVerificationMail(user.email!, link);
 

@@ -43,9 +43,17 @@ export class UsersController {
         return this.userService.getById(id);
     }
 
-
     @Post('internal/users/batch')
-    batch(@Body() body: { ids: number[] }){
+    batch(@Body() body: { ids: number[] }, @Headers('x-internal-token') token?: string){
+        this.assertInternal(token);
         return this.userService.getUsersPublicBatch(body.ids);
     }
+
+    @Post('internal/users/status/batch')
+    async setStatusBatch(@Body() body: { ids: number[]; status: 'ONLINE'|'OFFLINE'|'IN_GAME' },
+                        @Headers('x-internal-token') token?: string) {
+    this.assertInternal(token);
+    return this.userService.setStatusBatch(body.ids, body.status);
+    }
+
 }

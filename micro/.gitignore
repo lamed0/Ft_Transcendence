@@ -1,8 +1,8 @@
-# /apps/auth/.env
-# /apps/friends/.env
-# /apps/game/.env
-# /apps/gateway/.env
-# /apps/mail/.env
-# /apps/users/.env
-# /db/.env
+/apps/auth/.env
+/apps/friends/.env
+/apps/game/.env
+/apps/gateway/.env
+/apps/mail/.env
+/apps/users/.env
+/db/.env
 

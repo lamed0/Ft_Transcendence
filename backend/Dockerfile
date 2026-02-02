@@ -6,6 +6,9 @@ COPY package*.json ./
 
 RUN npm install
 
+# Install Prisma CLI v5 globally for team access
+RUN npm install -g prisma@5
+
 COPY prisma ./prisma
 COPY .env ./
 

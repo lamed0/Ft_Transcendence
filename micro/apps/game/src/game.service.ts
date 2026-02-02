@@ -29,6 +29,7 @@ export class GameService {
             include: { participants: true },
         });
         if (!session) throw new NotFoundException('Session not found');
+        if (session.status === 'CANCELED') throw new BadRequestException('Session canceled');
 
         const isPlayer = session.participants.some(
             (p) => p.userId === userId && p.role === 'PLAYER',
@@ -44,7 +45,7 @@ export class GameService {
                 scoreB: dto.scoreB,
                 endedAt: new Date(),
             },
-            select: { id: true, status: true, scoreA: true, scoreB: true },
+            select: { id: true, status: true, scoreA: true, scoreB: true, playerALevel: true, playerBLevel: true },
         });
     }
 
@@ -56,7 +57,16 @@ export class GameService {
         },
         orderBy: { endedAt: 'desc' },
         take: 30,
-        include: {
+        select: {
+            id: true,
+            mode: true,
+            status: true,
+            scoreA: true,
+            scoreB: true,
+            playerALevel: true,
+            playerBLevel: true,
+            startedAt: true,
+            endedAt: true,
             participants: { select: { userId: true, role: true } },
         },
         });

@@ -1,26 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { GameDatabaseService } from '../game-database.service';
+import { FriendsClient } from "../clients/friends.client";
 
 @Injectable()
 export class PermissionService{
-    constructor(private readonly prisma: GameDatabaseService){}
+    constructor(private readonly prisma: GameDatabaseService, private readonly friendClient: FriendsClient){}
 
     async areFriends(userA: number, userB: number){
-        if (userA === userB) return true;
-
-        const low = Math.min(userA, userB);
-        const high = Math.max(userA, userB);
-
-        const friendship = await this.prisma.friends.findUnique({
-            where: {
-                userLowId_userHighId: {
-                    userLowId: low,
-                    userHighId: high,
-                },
-            },
-            select: { status: true },
-        });
-        return friendship?.status === 'ACCEPTED';    
+        return this.friendClient.areFriends(userA, userB);   
     }
 
     async canSpectate(userId: number, sessionId: string){
@@ -37,24 +24,6 @@ export class PermissionService{
     
     if (playerIds.length === 0) return false;
 
-    // Fetch friendships in a SINGLE query
-    const friendship = await this.prisma.friends.findFirst({
-        where: {
-            OR: [
-                {
-                    userLowId: userId,
-                    userHighId: { in: playerIds },
-                    status: 'ACCEPTED',
-                },
-                {
-                    userHighId: userId,
-                    userLowId: { in: playerIds },
-                    status: 'ACCEPTED',
-                },
-            ],
-        },
-    });
-
-    return !!friendship;
+    return this.friendClient.anyAccepted(userId, playerIds);
 }
 }

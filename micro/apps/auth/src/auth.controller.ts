@@ -25,13 +25,39 @@ export class AuthController {
     @RateLimit({ max: 5, windowMs: 900000 }) // 5 requests per 15 minutes
     @UseGuards(LocalGuard, RateLimitGuard)
     @Post('login')
-    async login(@Req() req: AuthenticatedRequest){
-        return req.user;
+    async login(@Req() req: AuthenticatedRequest, @Res() res: Response){
+        const { accessToken, refreshToken, user } = req.user;
+        
+        res.cookie('accessToken', accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 15 * 60 * 1000, // 15 minutes
+        });
+        
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        });
+        
+        return res.json({ user });
     }
 
     @Post('guest')
-    async guest(){
-        return this.authService.guestLogin();
+    async guest(@Res() res: Response){
+        const result = await this.authService.guestLogin();
+        
+        // Set HTTP-only cookie with access token
+        res.cookie('accessToken', result.accesToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 15 * 60 * 1000, // 15 minutes
+        });
+        
+        return res.json({ user: result.user });
     }
 
     @UseGuards(JwtAuthGuard)
@@ -57,8 +83,19 @@ export class AuthController {
 
     @Public()
     @Get('verify-email')
-    async verifyEmail(@Query('token') token: string){
-        return this.authService.verifyEmail(token);
+    async verifyEmail(@Query('token') token: string, @Res() res: Response){
+        const result = await this.authService.verifyEmail(token);
+        
+        // Set HTTP-only cookie (secure, not visible in URL)
+        res.cookie('accessToken', result.accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 15 * 60 * 1000, // 15 minutes
+        });
+        
+        // Redirect to home without token in URL
+        return res.redirect('http://localhost:5173/home');
     }
 
     @Public()
@@ -112,7 +149,17 @@ export class AuthController {
         }
         
         const response = await this.authService.ftLogin(req.user);
-        return res.redirect(`http://localhost:5173/home?token=${response.accessToken}`);
+        
+        // Set HTTP-only cookie (secure, not visible in URL)
+        res.cookie('accessToken', response.accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 15 * 60 * 1000, // 15 minutes
+        });
+        
+        // Redirect to home without token in URL
+        return res.redirect('http://localhost:5173/home');
     }
 
 }

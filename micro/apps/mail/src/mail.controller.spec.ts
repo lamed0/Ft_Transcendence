@@ -8,7 +8,14 @@ describe('MailController', () => {
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
       controllers: [MailController],
-      providers: [MailService],
+      providers: [
+        {
+          provide: MailService,
+          useValue: {
+            sendEmail: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
     mailController = app.get<MailController>(MailController);

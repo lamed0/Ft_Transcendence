@@ -7,9 +7,14 @@ import { InvitesService } from './invite/invite.service';
 import { GameGateway } from './realtime/game.gateway';
 import { JwtService } from '@nestjs/jwt';
 import { MatchmakingService } from './matchmaking/matchmaking.service';
+import { HttpModule } from '@nestjs/axios';
+import { FriendsClient } from './clients/friends.client';
+import { UsersClient } from './clients/users.client';
 
 @Module({
+  imports: [HttpModule],
   controllers: [GameController],
-  providers: [GameService, PermissionService, GameDatabaseService, InvitesService, GameGateway, JwtService, MatchmakingService]
+  providers: [GameService, PermissionService, GameDatabaseService, InvitesService,
+              GameGateway, JwtService, MatchmakingService, FriendsClient, UsersClient]
 })
 export class GameModule {}

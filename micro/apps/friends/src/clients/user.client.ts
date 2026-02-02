@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 
-type PublicUser = { id: number; username: string; avatarUrl: string | null; status: string };
+type PublicUser = { id: number; username: string; avatarUrl: string | null; status: string; level: number };
 
 @Injectable()
 export class UsersClient {

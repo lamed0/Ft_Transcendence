@@ -13,6 +13,7 @@ import { Server, Socket } from 'socket.io';
 import { SocketAuthGuard } from './socket-auth.guard';
 import { GameDatabaseService } from '../game-database.service';
 import { PermissionService } from '../permission/permission.service';
+import { UsersClient } from '../clients/users.client';
 
 type JoinAs = 'player' | 'spectator';
 
@@ -36,8 +37,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private runtime = new Map<string, { players: Set<number>; started: boolean }>();
 
   constructor(
-    private prisma: GameDatabaseService,
     private permissions: PermissionService,
+    private readonly prisma: GameDatabaseService,
+    private readonly userClient: UsersClient
   ) {}
 
   // ---------- connection lifecycle ----------
@@ -352,25 +354,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     private async setPlayersInGame(sessionId: string) {
     const playerIds = await this.getPlayerIds(sessionId);
+    await this.userClient.setStatusBatch(playerIds, 'IN_GAME');
+  }
 
-    if (playerIds.length === 0) return;
-
-    await this.prisma.users.updateMany({
-        where: { id: { in: playerIds } },
-        data: { status: 'IN_GAME' },
-    });
-    }
-
-    private async setPlayersOnline(sessionId: string) {
+  private async setPlayersOnline(sessionId: string) {
     const playerIds = await this.getPlayerIds(sessionId);
+    await this.userClient.setStatusBatch(playerIds, 'ONLINE');
+  }
 
-    if (playerIds.length === 0) return;
-
-    await this.prisma.users.updateMany({
-        where: { id: { in: playerIds } },
-        data: { status: 'ONLINE' },
-    });
-    }
 
 
 }

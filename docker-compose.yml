@@ -37,6 +37,45 @@
 #   postgres_data:
 
 
+# services:
+#   back-end:
+#     build: ./backend
+#     container_name: backend
+#     env_file:
+#       - ./backend/.env
+#     ports:
+#       - "3000:3000"
+#     volumes:
+#       - ./backend:/app
+#       - /app/node_modules
+#     depends_on:
+#       - postgres
+
+#   postgres:
+#     image: postgres:16
+#     container_name: transcendence-db
+#     restart: always
+#     env_file:
+#       - ./backend/.env
+#     ports:
+#       - "5433:5432"
+#     volumes:
+#       - postgres_data:/var/lib/postgresql/data
+
+#   adminer:
+#     image: adminer:latest
+#     container_name: adminer
+#     restart: always
+#     ports:
+#       - "8080:8080"
+#     depends_on:
+#       - postgres
+
+
+# volumes:
+#   postgres_data:
+
+
 services:
   postgres:
     image: postgres:16
@@ -90,18 +129,18 @@ services:
     depends_on:
       - postgres
 
-  # game:
-  #   build:
-  #     context: ./micro
-  #     dockerfile: ./apps/game/Dockerfile
-  #   container_name: game
-  #   restart: always
-  #   env_file:
-  #     - ./micro/apps/game/.env
-  #   ports:
-  #     - "3002:3002"
-  #   depends_on:
-  #     - postgres
+  game:
+    build:
+      context: ./micro
+      dockerfile: ./apps/game/Dockerfile
+    container_name: game
+    restart: always
+    env_file:
+      - ./micro/apps/game/.env
+    ports:
+      - "3002:3002"
+    depends_on:
+      - postgres
 
   friends:
     build:
@@ -120,9 +159,21 @@ services:
     build:
       context: ./front
       dockerfile: Dockerfile
+    container_name: ziad
     ports:
       - "5173:5173"
     restart: always
+
+  ping_game:
+    build:
+      context: ./ping_game
+      dockerfile: Dockerfile
+    container_name: game_server
+    ports:
+      - "8080:8080"
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
 
 volumes:
   postgres_micro_data:
