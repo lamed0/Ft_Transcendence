@@ -4,7 +4,8 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json bun.lock ./
-
+#install curl for health check
+RUN apt-get update && apt-get install -y curl
 # Install dependencies
 RUN bun install
 
@@ -14,7 +15,7 @@ COPY public ./public
 COPY tsconfig.json webpack.config.cjs ./
 
 # Expose port
-EXPOSE 8080 5000
+EXPOSE 8082 5001
 
 # Start dev server
 CMD ["bun", "run", "dev"]

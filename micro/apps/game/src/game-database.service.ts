@@ -3,6 +3,10 @@ import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class GameDatabaseService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+    constructor() {
+        super();
+    }
+    
     async onModuleInit() {
         await this.$connect();
     }

@@ -5,11 +5,13 @@
 let beforeUnloadAdded = false; 
 let wsClient = null;
 let front_side = null;
-let Paddle1_export = null, Paddle2_export= null, Ball_export= null;
+let Paddle1_export = null, Paddle2_export= null, Ball_export= null, PwrState = null;
 let is_joining = false;
+let side = null;
 let score = [0,0];
-export {score};
-export {Ball_export as ball, Paddle1_export as Player1, Paddle2_export as Player2, wsClient};
+let payload = null;
+export {score, front_side, payload};
+export {Ball_export as ball, Paddle1_export as Player1, Paddle2_export as Player2, wsClient, PwrState};
 export function waiting_player(){
     return new Promise((resolve) =>{
         const verify = ()=>{
@@ -57,23 +59,32 @@ export function setupNetwork() {
 
 
     // 1. Initialize WebSocket
-    console.log("setupNetwork called");
+    // console.log("setupNetwork called");
 
-    wsClient = new WebSocket('ws://localhost:5000'); // Adjust to your server URL
+    wsClient = new WebSocket('ws://localhost:5001'); // Adjust to your server URL
     if(!wsClient)
         alert('Check connection with the server');
     console.log("WebSocket connection established");
     wsClient.onerror = (error) =>{
-        console.log("Error when connecting to the websocket");
+        // console.log("Error when connecting to the websocket");
         alert('Error when connecting to the websocket');
         reject(error);
     }
     wsClient.onopen = () =>{
-        console.log("WebSocket connection established");
+        // console.log("WebSocket connection established");
+        const urlParams = new URLSearchParams(window.location.search);
+        const matchDataRaw = urlParams.get("match_data");
+        const matchData = JSON.parse(matchDataRaw);
+        // console.log("DATA are sent to the server: ");
+        // console.log(matchData);
+        const msg = {type: 'DATA', 
+            data: matchData
+        }
+        wsClient.send(JSON.stringify(msg));
         resolve();
     }
     wsClient.onclose = (event)=>{
-        console.log('WebSocket closed:', event.code, event.reason);
+        // console.log('WebSocket closed:', event.code, event.reason);
         is_joining = false;
         // Optionally update UI to show disconnection
         updateWaitingUI(false);
@@ -89,16 +100,18 @@ export function setupNetwork() {
         switch (message.state) {
             case 'ASSIGN_ID':
                 // State 1: Initialization
-                console.log("id " + message.id)
+                // console.log("id " + message.id)
                 handleHandshake(message.id, message.side);
                 break;
             case 'OPPONENT_LEFT':
                 // State 4: Opponent Left
+                // console.log("Opponent has left the game");
                 updateWaitingUI(false);
                 is_joining = false;
                 break;
             case 'OPPONENT_JOINED':
                 // State 2: Waiting/Transition
+                // console.log("DEBUG:  Opponent has joined the game");
                 updatescenepos(message.ball, message.P1, message.P2);
                 updateWaitingUI(true);
                 is_joining = true;
@@ -106,7 +119,30 @@ export function setupNetwork() {
 
             case 'GAME_UPDATE':
                 // State 3: Active Gameplay
-                updategame(message.ball , message.paddleY, message.score);
+                updategame(message.ball , message.paddleY, message.score, message.powups, message.PaddelH);
+                break;
+            case 'ROUND_OVER':
+                // State: Round Over - Animation phase
+                payload = message;
+                score = message.score;
+                // console.log("********************* " + JSON.stringify(message));
+                // console.log("Round Over - Winner: Player " + (message.roundWinner === 1 ? "1" : "2"));
+                break;
+            case 'COUNTDOWN':
+                // State: Countdown before next round
+                payload = message;
+                // console.log("Countdown for round " + message.round);
+                break;
+            case 'MATCH_OVER':
+                // State: Match is completely over
+                payload = message;
+                score = message.score;
+                // console.log("Match Over!");
+                break;
+            case 'GAME_OVER':
+                // State 6: Game Over
+                // console.log("Game Over state received");
+                // Trigger game over UI or reset logic here
                 break;
         }
 
@@ -130,7 +166,7 @@ export function setupNetwork() {
             console.log("Waiting for opponent...");
         }
     }
-    //Event listeners for key press down and up
+    //Event listeners for key press down and up and send data to the server
     document.addEventListener('keydown', function(event) {
         if (!wsClient || wsClient.readyState !== WebSocket.OPEN) {
             console.warn('WebSocket not ready, skipping input');
@@ -182,12 +218,15 @@ export function setupNetwork() {
         Paddle2_export = Player2;
         Ball_export = b;
     }
-    function updategame(b , paddleY, score_update){
+    function updategame(b , paddleY, score_update, powups, PaddelH){
         if (Paddle1_export && Paddle2_export) {
             Paddle1_export.y = paddleY.P1; 
             Paddle2_export.y = paddleY.P2;
+            Paddle1_export.height = PaddelH.P1;
+            Paddle2_export.height = PaddelH.P2;
             Ball_export = b;
             score = score_update;
+            PwrState = powups;
         }
         else {
                 console.warn('Paddles not initialized yet');}

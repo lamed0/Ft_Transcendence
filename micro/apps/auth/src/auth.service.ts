@@ -2,8 +2,8 @@ import { BadRequestException, ConflictException, HttpException, HttpStatus, Inje
 import { AuthPayloadDto } from './dto/auth.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { AuthDatabaseService } from './auth-database.service';
 import * as bcrypt from 'bcrypt'; 
+import { PrismaService } from './prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { GoogleDto } from './dto/google.dto';
 import { FtDto } from './dto/ft.dto';
@@ -11,14 +11,18 @@ import { MailService } from '../../../apps/mail/src/mail.service';
 import { makeEmailVerifyToken } from './utils/token';
 import { createHash } from 'crypto';
 import { NotFoundError } from 'rxjs';
+import { TwoFactorAuthenticationService } from './twoFactor/twoFactor.service';
+
+//heeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeere
 
 @Injectable()
 export class AuthService {
     constructor ( 
         private jwtService: JwtService, 
-        private prisma: AuthDatabaseService, 
+        private prisma: PrismaService, 
         private mailService: MailService,
         private configService: ConfigService,
+        private twoFactorService: TwoFactorAuthenticationService,
     ) {}
 
     async validateUser({ username, password }:  AuthPayloadDto){
@@ -35,12 +39,45 @@ export class AuthService {
         const isValid = await bcrypt.compare(password, user.password);
         if (!isValid) throw new UnauthorizedException('Invalid password');
 
+        if (user.isTwoFactorAuthenticationEnabled) {
+            return {
+                requires2fa: true,
+                userId: user.id,
+                message: "2FA required"
+            };
+        }
+
         const update = await this.prisma.users.update({
             where: { id: user.id },
             data: { status: 'ONLINE' },
             select: { id: true, username: true, status: true, email: true },
         })
         return this.signTokenWithUser(update.id);
+    }
+
+        async loginWith2fa(userId: number, code: string) {
+        console.log(`🔍 [DEBUG] Attempting 2FA for User ${userId} with code: ${code}`);
+
+        const user = await this.prisma.users.findUnique({ where: { id: userId } });
+        
+        if (!user) throw new UnauthorizedException('User not found');
+        if (!user.twoFactorAuthenticationSecret) throw new UnauthorizedException('2FA is not set up');
+
+        // 👇 FIX: Add 'await' here!
+        const isCodeValid = await this.twoFactorService.isTwoFactorCodeValid(
+            code,
+            { twoFactorAuthenticationSecret: user.twoFactorAuthenticationSecret }
+        );
+
+        console.log(`🔍 [DEBUG] Code Validity Result: ${isCodeValid}`);
+
+        // Now this will correctly use true/false
+        if (!isCodeValid) {
+            console.log(`🛑 [DEBUG] Blocking Invalid Code!`);
+            throw new UnauthorizedException('Invalid 2FA Code');
+        }
+        
+        return this.signTokenWithUser(user.id);
     }
 
     async register(dto: RegisterDto){
@@ -70,9 +107,8 @@ export class AuthService {
                 expiresAt: new Date(Date.now() + 30 * 60  * 1000),
             },
         });
-        // Use backend API URL for verification, not frontend
-        const backendUrl = process.env.API_URL || 'http://localhost:3001';
-        const link = `${backendUrl}/auth/verify-email?token=${raw}`;
+        const backendUrl = process.env.BACK_URL || 'https://localhost';
+        const link = `${backendUrl}/api/auth/verify-email?token=${raw}`;
         try{
             await this.mailService.sendVerificationMail(user.email!, link);
             console.log('Verification email sent successfully to:', user.email);
@@ -123,7 +159,7 @@ export class AuthService {
             where: {id: userId},
             data: {refreshToken: hashed},
         });
-        return ({accessToken});
+        return ({accessToken, refreshToken});
     }
 
     async validateGoogleUser(googleUser: GoogleDto){
@@ -131,11 +167,9 @@ export class AuthService {
             where: {email: googleUser.email},
         });
         if (user) {
-            // Check if trying to link a different Google account
             if (user.googleId && user.googleId !== googleUser.googleId) {
                 throw new ConflictException('This email is already linked to a different Google account');
             }
-            // If user exists but no googleId, link the new Google account
             if (!user.googleId) {
                 return await this.prisma.users.update({
                     where: {id: user.id},
@@ -144,10 +178,20 @@ export class AuthService {
             }
             return user;
         }
+
+        let username = googleUser.email.split('@')[0];
+        const existingUsername = await this.prisma.users.findUnique({
+            where: { username }
+        });
+        
+        if (existingUsername) {
+            username = `${username}_${googleUser.googleId.slice(0, 6)}`;
+        }
+
         return await this.prisma.users.create({
             data: {
                 email: googleUser.email,
-                username: `${googleUser.email.split('@')[0]}_${googleUser.googleId.slice(0, 6)}`,
+                username,
                 googleId: googleUser.googleId,
                 avatarUrl: googleUser.avatarUrl,
                 password: null,
@@ -167,11 +211,9 @@ export class AuthService {
             where: {email: ftUser.email},
         });
         if (user){
-            // Check if trying to link a different 42 account
             if (user.ftId && user.ftId !== ftUser.ftId) {
                 throw new ConflictException('This email is already linked to a different 42 account');
             }
-            // If user exists but no ftId, link the new 42 account
             if (!user.ftId){
                 return this.prisma.users.update({
                     where: {id: user.id},
@@ -204,8 +246,9 @@ export class AuthService {
             select: {
             id: true,
             username: true,
-            email: true,      // keep if you want frontend to show it
+            email: true, 
             avatarUrl: true,
+            level: true,
             status: true,
             createdAt: true,
             },
@@ -229,11 +272,23 @@ export class AuthService {
 
         const accesToken = this.jwtService.sign(payload, {
             secret: process.env.JWT_ACCESS_SECRET,
-            expiresIn: '30',
+            expiresIn: '15m',
         });
 
-        return { accesToken, user: { id: user.id, username: user.username, avatarUrl: user.avatarUrl, status: user.status, isGuest: true },};
+        const refreshToken = this.jwtService.sign(payload, {
+            secret: process.env.JWT_REFRESH_SECRET,
+            expiresIn: '7d',
+        });
+
+        const hashed = await bcrypt.hash(refreshToken, 10);
+        await this.prisma.users.update({
+            where: { id: user.id },
+            data: { refreshToken: hashed, status: 'ONLINE' },
+        });
+
+        return { accesToken, refreshToken, user: { id: user.id, username: user.username, avatarUrl: user.avatarUrl, status: user.status, isGuest: true, level: user.level } };
     }
+
 
     async verifyEmail(rawToken: string) {
     if (!rawToken) throw new BadRequestException('Missing token');
@@ -262,7 +317,6 @@ export class AuthService {
         data: { usedAt: new Date() },
     });
 
-    // Auto-login user with tokens
     return this.signTokenWithUser(user.id);
     }
 
@@ -305,9 +359,8 @@ export class AuthService {
             },
         });
 
-        // Use backend API URL for verification, not frontend
-        const backendUrl = process.env.API_URL || 'http://localhost:3001';
-        const link = `${backendUrl}/auth/verify-email?token=${raw}`;
+        const backendUrl = process.env.BACK_URL || 'https://localhost';
+        const link = `${backendUrl}/api/auth/verify-email?token=${raw}`;
 
         await this.mailService.sendVerificationMail(user.email!, link);
 
@@ -315,6 +368,7 @@ export class AuthService {
     }
 
     async changePassword(userId: number, oldPassword: string, newPassword: string, confirmPassword: string) {
+        if (oldPassword === newPassword) throw new BadRequestException("The new password should not match the old one");
         if (newPassword !== confirmPassword) {
             throw new BadRequestException('Passwords do not match');
         }

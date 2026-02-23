@@ -3,9 +3,10 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { AuthDatabaseService } from './auth-database.service';
+import { PrismaService } from './prisma/prisma.service';
 import { MailService } from '../../../apps/mail/src/mail.service';
 import { APP_GUARD } from '@nestjs/core';
+//heeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeere
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -33,7 +34,7 @@ describe('AuthController', () => {
           },
         },
         {
-          provide: AuthDatabaseService,
+          provide: PrismaService,
           useValue: {
             users: {
               findUnique: jest.fn(),

@@ -9,7 +9,7 @@ export class UsersClient {
   constructor(private readonly http: HttpService) {}
 
   private baseUrl() {
-    return process.env.AUTH_URL ?? 'http://localhost:3001';
+    return process.env.AUTH_SERVICE_URL ?? 'http://auth:3001';
   }
 
   private headers() {

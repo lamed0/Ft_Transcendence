@@ -2,7 +2,6 @@ import { Body, Controller, Delete, Get, Headers, Param, ParseIntPipe, Post, Quer
 import { JwtAuthGuard } from '../../../libs/common/guards/jwt.guard';
 import { FriendsService } from './friends.service';
 
-@UseGuards(JwtAuthGuard)
 @Controller('friends')
 export class FriendsController {
     constructor(private readonly friendsSevice: FriendsService){}
@@ -12,24 +11,41 @@ export class FriendsController {
           throw new UnauthorizedException('Internal access only');
         }
     }
+    
     @Post('request/:userId')
+    @UseGuards(JwtAuthGuard)
     async send(@Req() req: any, @Param('userId', ParseIntPipe) userId: number){
-        return this.friendsSevice.sendReq(req.user.id, userId);
+        return this.friendsSevice.sendReq(req.user.sub, userId);
     }
 
+    @Post('request/:userId/internal')
+    async sendInternal(@Param('userId', ParseIntPipe) userId: number, @Body() body: { senderId: number }, @Headers('x-internal-token') token?: string){
+        this.assertInternal(token);
+        return this.friendsSevice.sendReq(body.senderId, userId);
+    }
+
+    @UseGuards(JwtAuthGuard)
     @Post('request/:userId/accept')
     async accept(@Req() req: any, @Param('userId', ParseIntPipe) userId: number){
-        return this.friendsSevice.acceptReq(req.user.id, userId);
+        return this.friendsSevice.acceptReq(req.user.sub, userId);
     }
 
+    @UseGuards(JwtAuthGuard)
+    @Post('request/:userId/decline')
+    async decline(@Req() req: any, @Param('userId', ParseIntPipe) userId: number){
+        return this.friendsSevice.deleteRelationship(req.user.sub, userId);
+    }
+
+    @UseGuards(JwtAuthGuard)
     @Delete('request/:userId')
     deleteRelation(@Req() req: any, @Param('userId', ParseIntPipe) userId: number){
-        return this.friendsSevice.deleteRelationship(req.user.id, userId);
+        return this.friendsSevice.deleteRelationship(req.user.sub, userId);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Get()
     list(@Req() req: any) {
-        return this.friendsSevice.listFriends(req.user.id);
+        return this.friendsSevice.listFriends(req.user.sub);
     }
 
     @Get('internal/friends/are-friends')

@@ -8,7 +8,7 @@
   "main": "index.js",
   "scripts": {
     "build": "webpack",
-    "start": "webpack-dev-server --port 8080 --live-reload",
+    "start": "webpack-dev-server --port 8082 --live-reload",
     "server": "node src/game_server.js",
     "dev": "npm run server & npm run start "
   },

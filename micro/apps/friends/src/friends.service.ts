@@ -2,11 +2,13 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { FriendsDatabaseService } from './friends-database.service';
 import { normalizePair } from './utils/friends.utils';
 import { UsersClient } from './clients/user.client';
+import { FriendsGateway } from './friends.gateway';
+import { GatewayClient } from './clients/gateway.client';
 
 
 @Injectable()
 export class FriendsService {
-    constructor(private readonly prisma: FriendsDatabaseService, private readonly userClient: UsersClient){}
+    constructor(private readonly prisma: FriendsDatabaseService, private readonly userClient: UsersClient, private readonly gateway: FriendsGateway, private readonly gatewayClient: GatewayClient){}
 
     private async checkUserExist(userId: number){
         await this.userClient.exists(userId);
@@ -22,7 +24,7 @@ export class FriendsService {
             where: { userLowId_userHighId : { userLowId: low, userHighId: high }},
         });
         if (!existing){
-            return this.prisma.friends.create({
+            const result = await this.prisma.friends.create({
                 data: {
                     userLowId: low,
                     userHighId: high,
@@ -30,8 +32,14 @@ export class FriendsService {
                     status: 'PENDING',
                 },
             });
+            // Fetch sender's username and notify receiver via WebSocket
+            const [senderUser] = await this.userClient.batch([meId]);
+            this.gateway.notifyFriendRequest(meId, otherId, result.id, senderUser.username);
+            // Also notify main gateway for real-time delivery to root namespace
+            this.gatewayClient.notifyFriendRequest(meId, otherId, result.id, senderUser.username);
+            return result;
         }
-        if (existing.status === 'ACCEPTED') throw new ConflictException('Already friends');
+        if (existing.status === 'ACCEPTED') throw new ConflictException('c');
         if (existing.requestedBy === meId) throw new ConflictException('Request already sent');
         throw new ConflictException('You already have an incoming friend request from this user');
     }
@@ -93,13 +101,11 @@ export class FriendsService {
             },
             orderBy: { updatedAt: 'desc'},
         });
-        const friendIds = rows.map((r) => (r.userLowId === meId? r.userHighId : r.userLowId));
+        const friendIds = rows.map(r => (r.userLowId === meId ? r.userHighId : r.userLowId));
         const friendsWithDetails = await this.userClient.batch(friendIds);
-        return friendsWithDetails.sort((a, b) => {
-            const aIdx = friendIds.indexOf(a.id);
-            const bIdx = friendIds.indexOf(b.id);
-            return aIdx - bIdx;
-        });
+        // Ensure order and no duplicates
+        const friendsOrdered = friendIds.map(id => friendsWithDetails.find(u => u.id === id));
+        return friendsOrdered.filter(u => u);
     }
 
     async areFriends(userA: number, userB: number){
@@ -129,5 +135,34 @@ export class FriendsService {
             select: { id: true},
         });
         return !!fr; //if theres friends it return true else false
+    }
+
+    async getPendingRequests(userId: number) {
+        const requests = await this.prisma.friends.findMany({
+            where: { 
+                status: 'PENDING',
+                OR: [
+                    { userLowId: userId, requestedBy: { not: userId } },
+                    { userHighId: userId, requestedBy: { not: userId } },
+                ],
+            },
+            select: {
+                id: true,
+                userLowId: true,
+                userHighId: true,
+                requestedBy: true,
+                createdAt: true,
+            },
+        });
+
+        // Fetch usernames for all requesters
+        const userIds = [...new Set(requests.map(r => r.requestedBy))];
+        const users = await this.userClient.batch(userIds);
+        const usernameMap = new Map(users.map(u => [u.id, u.username]));
+
+        return requests.map(req => ({
+            ...req,
+            requesterUsername: usernameMap.get(req.requestedBy) || 'Unknown'
+        }));
     }
 }

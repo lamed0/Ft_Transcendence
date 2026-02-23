@@ -1,4 +1,4 @@
-import { IsOptional, IsString, Length, Matches } from "class-validator";
+import { IsOptional, IsString, Length, Matches, IsEmail } from "class-validator";
 
 export class UpdateDto {
     
@@ -7,4 +7,12 @@ export class UpdateDto {
     @Length(3, 20)
     @Matches(/^[a-zA-Z0-9_]+$/)
     username?: string;
+
+    @IsOptional()
+    @IsEmail()
+    email?: string;
+
+    @IsOptional()
+    @IsString()
+    avatarUrl?: string;
 }

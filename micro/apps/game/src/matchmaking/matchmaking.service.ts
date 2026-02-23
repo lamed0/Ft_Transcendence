@@ -1,44 +1,46 @@
 import { Injectable } from '@nestjs/common';
-import { GameGateway } from '../realtime/game.gateway';
 import { GameDatabaseService } from '../game-database.service';
 import { UsersClient } from '../clients/users.client';
 
 type JoinQueueResult =
   | { status: 'SEARCHING' }
-  | { status: 'MATCHED'; sessionId: string; players: { id: number; username: string; avatarUrl: string | null }[] };
+  | { status: 'MATCHED'; sessionId: string; opponent: { id: number; username: string; avatarUrl: string | null; level?: number }; players: any[]; playerIds: number[] };
 
 @Injectable()
 export class MatchmakingService {
   constructor(
     private prisma: GameDatabaseService,
-    private gateway: GameGateway,
     private userClient: UsersClient
   ) {}
 
-    async joinQueue(userId: number): Promise<JoinQueueResult> {
-    // 1) if already searching, do nothing
-    const already = await this.prisma.matchmakingTicket.findFirst({
-        where: { userId, status: 'SEARCHING' },
-        select: { id: true },
-    });
-    if (already) return { status: 'SEARCHING' };
+  async joinQueue(userId: number): Promise<JoinQueueResult> {
+    if (!userId || typeof userId !== 'number') {
+      return { status: 'SEARCHING' };
+    }
 
-    // 2) create ticket
-    const myTicket = await this.prisma.matchmakingTicket.create({
-        data: { userId, status: 'SEARCHING' },
+    // 0) Upsert ticket - ensures we have exactly one ticket per user
+    const myTicket = await this.prisma.matchmakingTicket.upsert({
+        where: { userId },
+        update: { status: 'SEARCHING', createdAt: new Date() },
+        create: { userId, status: 'SEARCHING' },
         select: { id: true, createdAt: true },
     });
 
-    // 3) find oldest other searching ticket
+    // 1) find oldest other searching ticket (excluding own ticket)
     const partner = await this.prisma.matchmakingTicket.findFirst({
-        where: { status: 'SEARCHING', userId: { not: userId } },
+        where: { 
+            status: 'SEARCHING', 
+            userId: { not: userId }
+        },
         orderBy: { createdAt: 'asc' },
         select: { id: true, userId: true },
     });
 
-    if (!partner) return { status: 'SEARCHING' };
+    if (!partner) {
+      return { status: 'SEARCHING' };
+    }
 
-    // 4) atomic match (transaction)
+    // 2) atomic match (transaction)
     const match = await this.prisma.$transaction(async (tx) => {
         // re-check partner still SEARCHING (important)
         const p = await tx.matchmakingTicket.findUnique({
@@ -70,25 +72,24 @@ export class MatchmakingService {
         },
         });
 
-        return { sessionId: session.id, playerIds: [userId, p.userId] };
+        const users = await this.userClient.batch([userId, p.userId]);
+        const players = users.map(u => ({
+          id: u.id,
+          username: u.username,
+          avatarUrl: u.avatarUrl ?? null,
+          level: u.level ?? 1,
+        }));
+        return { sessionId: session.id, playerIds: [userId, p.userId], players };
     });
 
     if (!match) return { status: 'SEARCHING' };
     
-    // Fetch player info
-    const users = await this.userClient.batch(match.playerIds);
+    const opponentId = match.playerIds.find(id => id !== userId)!;
+    const users = await this.userClient.batch([opponentId]);
+    const opponent = users[0];
 
-    // Keep same order as playerIds
-    const byId = new Map(users.map((u) => [u.id, u]));
-    const players = match.playerIds
-        .map((id) => byId.get(id))
-        .filter(Boolean)
-        .map((u) => ({ id: u!.id, username: u!.username, avatarUrl: u!.avatarUrl }));
-
-    // 5) push notify both users via WS (no polling)
-    this.gateway.notifyMatched(match.playerIds, match.sessionId);
-    return { status: 'MATCHED', sessionId: match.sessionId, players };
-    }
+    return { status: 'MATCHED', sessionId: match.sessionId, opponent: { id: opponent.id, username: opponent.username, avatarUrl: opponent.avatarUrl, level: opponent.level }, players: match.players, playerIds: match.playerIds };
+  }
 
   async leaveQueue(userId: number) {
     await this.prisma.matchmakingTicket.updateMany({

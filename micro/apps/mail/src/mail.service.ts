@@ -42,8 +42,7 @@ export class MailService {
             });
             return true;
         }catch(err){
-            console.error('NODEMAILER ERROR:', err);   // ✅ add this
-            // If err is an Error object:
+            console.error('NODEMAILER ERROR:', err); 
             console.error('NODEMAILER MESSAGE:', (err as any)?.message);
             console.error('NODEMAILER RESPONSE:', (err as any)?.response);
             console.error('NODEMAILER CODE:', (err as any)?.code);

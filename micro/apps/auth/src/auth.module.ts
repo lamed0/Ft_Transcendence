@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { AuthDatabaseService } from './auth-database.service';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { PrismaModule } from './prisma/prisma.module';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { RefreshStrategy } from './strategies/refresh.strategy';
@@ -18,6 +18,8 @@ import { MailService } from '../../../apps/mail/src/mail.service';
 import { MailModule } from '../../../apps/mail/src/mail.module';
 import { UsersModule } from './users.module';
 import { RedisModule } from 'libs/common/src/redis/redis.module';
+import { TwoFactorAuthenticationService } from './twoFactor/twoFactor.service';
+import { ApiKeyService } from './api-key.service';
 
 @Module({
   imports: [
@@ -26,6 +28,7 @@ import { RedisModule } from 'libs/common/src/redis/redis.module';
       envFilePath: 'apps/auth/.env',
     }),
     MailModule,
+    PrismaModule,
     UsersModule,
     RedisModule,
     PassportModule,
@@ -44,6 +47,16 @@ import { RedisModule } from 'libs/common/src/redis/redis.module';
 
   ],
   controllers: [AuthController],
-  providers: [AuthService, AuthDatabaseService, LocalStrategy, JwtStrategy, RefreshStrategy, GoogleStrategy, FtStrategy, MailService]
+  providers: [
+    AuthService, 
+    ApiKeyService,
+    LocalStrategy, 
+    JwtStrategy, 
+    RefreshStrategy, 
+    GoogleStrategy, 
+    FtStrategy, 
+    MailService,
+    TwoFactorAuthenticationService,
+  ]
 })
 export class AuthModule {}

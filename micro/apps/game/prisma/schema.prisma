@@ -4,17 +4,22 @@
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
+  previewFeatures = ["multischema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["game"]
 }
 
 // Add your models here
 enum GameMode {
   ONEVONE_QUEUE
   ONEVONE_INVITE
+
+  @@schema("game")
+
 }
 
 enum GameStatus {
@@ -22,17 +27,26 @@ enum GameStatus {
   LIVE
   FINISHED
   CANCELED
+
+  @@schema("game")
+
 }
 
 enum InviteStatus {
   PENDING
   ACCEPTED
   DECLINED
+
+  @@schema("game")
+
 }
 
 enum ParticipantRole {
   PLAYER
   SPECTATOR
+
+  @@schema("game")
+
 }
 
 model GameSession {
@@ -60,6 +74,7 @@ model GameSession {
   @@index([status])
   @@index([mode])
   @@index([hostUserId])
+  @@schema("game")
 }
 
 model GameParticipant {
@@ -74,6 +89,7 @@ model GameParticipant {
 
   @@unique([sessionId, userId])
   @@index([userId])
+  @@schema("game")
 }
 
 model GameInvite {
@@ -89,6 +105,7 @@ model GameInvite {
   @@index([fromUserId])
   @@index([toUserId])
   @@index([status])
+  @@schema("game")
 }
 
 model MatchmakingTicket {
@@ -100,7 +117,7 @@ model MatchmakingTicket {
   sessionId String?
   matchedAt DateTime?
 
-
   @@index([status])
   @@index([createdAt])
+  @@schema("game")
 }

@@ -7,17 +7,24 @@ import {
   ConnectedSocket,
   MessageBody,
 } from '@nestjs/websockets';
-import { UseGuards } from '@nestjs/common';
+import { UseGuards, Injectable } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
+import { JwtService } from '@nestjs/jwt';
 
 import { SocketAuthGuard } from './socket-auth.guard';
 import { GameDatabaseService } from '../game-database.service';
 import { PermissionService } from '../permission/permission.service';
 import { UsersClient } from '../clients/users.client';
+import { MatchmakingService } from '../matchmaking/matchmaking.service';
 
 type JoinAs = 'player' | 'spectator';
 
-@WebSocketGateway({ namespace: '/game', cors: true })
+@WebSocketGateway({
+  cors: {
+    origin: process.env.FRONTEND_URL ?? 'https://localhost',
+    credentials: true
+  }
+})
 export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
 
@@ -39,18 +46,53 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private permissions: PermissionService,
     private readonly prisma: GameDatabaseService,
-    private readonly userClient: UsersClient
+    private readonly userClient: UsersClient,
+    private readonly matchmaking: MatchmakingService,
+    private jwtService: JwtService
   ) {}
 
+  private validateAndSetUser(client: Socket): boolean {
+    // Try to get token from auth object first
+    let token = client.handshake.auth.token;
+    
+    // If not found, try to extract from cookie
+    if (!token && client.handshake.headers.cookie) {
+      const cookies = client.handshake.headers.cookie;
+      const match = cookies.match(/accessToken=([^;]+)/);
+      token = match ? match[1] : null;
+    }
+
+    if (!token) {
+      console.warn('No token found in WebSocket connection attempt');
+      return false;
+    }
+
+    try {
+      const payload = this.jwtService.verify(token, {
+        secret: process.env.JWT_ACCESS_SECRET,
+      });
+      console.log('🔐 Token verified - userId from token:', payload.sub);
+      client.data.user = payload;
+      return true;
+    } catch (err) {
+      console.error('Token verification failed:', err.message);
+      return false;
+    }
+  }
+
   // ---------- connection lifecycle ----------
-  @UseGuards(SocketAuthGuard)
   handleConnection(client: Socket) {
-    const userId = client.data.user.id as number;
+    if (!this.validateAndSetUser(client)) {
+      client.disconnect();
+      return;
+    }
+    
+    const userId = client.data.user.sub as number;
     client.join(`user:${userId}`);
   }
 
   handleDisconnect(client: Socket) {
-    const userId: number | undefined = client.data?.user?.id;
+    const userId: number | undefined = client.data?.user?.sub;
     if (!userId) return;
 
     for (const [sessionId, playersMap] of this.activePlayers.entries()) {
@@ -146,10 +188,19 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  notifyMatched(userIds: number[], sessionId: string) {
+  notifyMatched(
+    userIds: number[],
+    sessionId: string,
+    players: { id: number; username: string; avatarUrl: string | null; level?: number }[],
+  ) {
     for (const id of userIds) {
-      const opponentId = userIds.find(userId => userId !== id);
-      this.server.to(`user:${id}`).emit('mm.matched', { sessionId, opponentId, players: userIds });
+      const opponent = players.find(p => p.id !== id);
+      this.server.to(`user:${id}`).emit('mm.matched', {
+        sessionId,
+        opponentId: opponent?.id ?? null,
+        opponent: opponent ?? { id: 0, username: 'Unknown', avatarUrl: null },
+        players,
+      });
     }
   }
 
@@ -160,7 +211,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { sessionId: string; as: JoinAs },
   ) {
-    const userId = client.data.user.id as number;
+    const userId = client.data.user.sub as number;
     const sessionId = body.sessionId;
     const role = body.as;
 
@@ -272,7 +323,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { sessionId: string },
   ) {
-    const userId = client.data.user.id as number;
+    const userId = client.data.user.sub as number;
     const sessionId = body.sessionId;
     const room = this.matchRoom(sessionId);
 
@@ -305,7 +356,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     this.server.to(this.matchRoom(sessionId)).emit('input', {
-      userId: client.data.user.id,
+      userId: client.data.user.sub,
       player: body.player,
       dy: body.dy,
       t: Date.now(),
@@ -329,7 +380,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     const hostId = this.hostBySession.get(sessionId);
-    if (hostId && hostId !== client.data.user.id) {
+    if (hostId && hostId !== client.data.user.sub) {
       client.emit('state.denied', { reason: 'ONLY_HOST_CAN_PUSH_STATE' });
       return;
     }
@@ -362,6 +413,101 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     await this.userClient.setStatusBatch(playerIds, 'ONLINE');
   }
 
+  // ---------- matchmaking via WebSocket ----------
+  @SubscribeMessage('ping')
+  ping(@ConnectedSocket() client: Socket) {
+    client.emit('pong', { timestamp: Date.now() });
+  }
 
+  @SubscribeMessage('mm.join')
+  async mmJoin(@ConnectedSocket() client: Socket) {
+    try {
+      const userId = client.data.user?.sub as number;
+      
+      if (!userId) {
+        client.emit('mm.response', { status: 'ERROR', message: 'User not authenticated' });
+        return;
+      }
+      
+      const result = await this.matchmaking.joinQueue(userId);
+      
+      // If match found, notify both players
+      if (result.status === 'MATCHED') {
+        this.notifyMatched(result.playerIds, result.sessionId, result.players);
+      }
+      
+      client.emit('mm.response', result);
+    } catch (error) {
+      client.emit('mm.response', { status: 'ERROR', message: error.message });
+    }
+  }
 
+  @SubscribeMessage('mm.leave')
+  async mmLeave(@ConnectedSocket() client: Socket) {
+    try {
+      const userId = client.data.user?.sub as number;
+      if (!userId) {
+        client.emit('mm.response', { status: 'ERROR', message: 'User not authenticated' });
+        return;
+      }
+      const result = await this.matchmaking.leaveQueue(userId);
+      client.emit('mm.response', result);
+    } catch (error) {
+      client.emit('mm.response', { status: 'ERROR', message: error.message });
+    }
+  }
+
+  @SubscribeMessage('score.update')
+  async updateScore(
+    @MessageBody() payload: { sessionId: string; userId: number; score: number; apiKey?: string },
+    @ConnectedSocket() client: Socket
+  ) {
+    try {
+      // If API key provided (external game server), validate it
+      if (payload.apiKey) {
+        // Validate API key via auth service
+        // For now, we'll trust the internal token method
+        if (!process.env.INTERNAL_TOKEN) {
+          return { success: false, error: 'Internal error' };
+        }
+      }
+
+      const session = await this.prisma.gameSession.findUnique({
+        where: { id: payload.sessionId },
+        include: { participants: true },
+      });
+
+      if (!session) {
+        return { success: false, error: 'Session not found' };
+      }
+
+      const isPlayer = session.participants.some(p => p.userId === payload.userId && p.role === 'PLAYER');
+      if (!isPlayer) {
+        return { success: false, error: 'User not in this session' };
+      }
+
+      // Find which player this is (A or B)
+      const playerIndex = session.participants.findIndex(p => p.userId === payload.userId && p.role === 'PLAYER');
+      const updateData = playerIndex === 0 ? { scoreA: payload.score } : { scoreB: payload.score };
+
+      const updated = await this.prisma.gameSession.update({
+        where: { id: payload.sessionId },
+        data: updateData,
+      });
+
+      // Broadcast to all players in session
+      const sessionRoom = `session_${payload.sessionId}`;
+      this.server.to(sessionRoom).emit('score.updated', {
+        userId: payload.userId,
+        score: payload.score,
+        scoreA: playerIndex === 0 ? payload.score : updated.scoreA,
+        scoreB: playerIndex === 1 ? payload.score : updated.scoreB,
+        timestamp: new Date(),    
+      });
+
+      return { success: true, score: payload.score };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
 }

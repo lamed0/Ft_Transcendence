@@ -25,9 +25,9 @@ export class JwtStrategy extends PassportStrategy(Strategy){
     validate(payload: any){
         console.log('Inside JWT strategy Validate');
         console.log(payload);
-        const id = payload.sub ?? payload.id;
-        if (!id) throw new UnauthorizedException("Token payload missing user id");
+        const sub = payload.sub ?? payload.id;
+        if (!sub) throw new UnauthorizedException("Token payload missing user id");
 
-        return { id, username: payload.username };
+        return { sub, username: payload.username };
     }
 }

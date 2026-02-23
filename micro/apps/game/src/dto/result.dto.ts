@@ -1,9 +1,12 @@
 import { IsInt, Min } from "class-validator";
 
-export class SubmitScoreResult{
+export class SubmitScoreResult {
     @IsInt() @Min(0)
-    scoreA: number;
+    scoreA?: number;
 
     @IsInt() @Min(0)
-    scoreB: number;
+    scoreB?: number;
+
+    @IsInt()
+    level?: number; 
 }

@@ -36,10 +36,14 @@ model users {
   isEmailVerified Boolean    @default(false)
   level           Int        @default(0)
 
+  twoFactorAuthenticationSecret String?
+  isTwoFactorAuthenticationEnabled Boolean @default(false)
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   emailTokens email_token[]
+  apiKeys     ApiKey[]
 
   @@schema("auth")
 }
@@ -56,6 +60,22 @@ model email_token {
 
   @@index([userId])
   @@index([expiresAt])
+  @@schema("auth")
+}
+
+model ApiKey {
+  id          Int       @id @default(autoincrement())
+  key         String    @unique
+  name        String
+  userId      Int?
+  user        users?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isRevoked   Boolean   @default(false)
+  rateLimit   Int       @default(1000) // requests per hour
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([key])
+  @@index([userId])
   @@schema("auth")
 }
 

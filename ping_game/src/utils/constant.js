@@ -1,5 +1,5 @@
 
-const CONSTANTS = { PORT: 5000 };
+const CONSTANTS = { PORT: 5001 };
 
 export const keysPress = {
     ArrowUp: false,
@@ -13,11 +13,13 @@ arr.push({...keysPress});
 arr.push({...keysPress});
 export const COURT_DEPTH = 1107;
 export const COURT_WIDTH = 554;
+export const POWER_UPS_SIZE = 40;
 //fix the wrong values of COURT_DEPTH and COURT_WIDTH after
 
+export const Paddle_h = 20;
+export const Paddle_w = 100;
 const COURT_DEPTH_fix = 554;
 const COURT_WIDTH_fix = 1107;
-
 // export const PADDLE_SPEED = 300; // pixels per second
 export default CONSTANTS;
 

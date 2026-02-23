@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE "users" ALTER COLUMN "ftId" SET DATA TYPE TEXT;

@@ -1,82 +1,29 @@
-# services:
-#   back-end:
-#     build: ./backend
-#     container_name: backend
-#     env_file:
-#       - ./backend/.env
-#     ports:
-#       - "3000:3000"
-#     volumes:
-#       - ./backend:/app
-#       - /app/node_modules
-#     depends_on:
-#       - postgres
-
-#   postgres:
-#     image: postgres:16
-#     container_name: transcendence-db
-#     restart: always
-#     env_file:
-#       - ./backend/.env
-#     ports:
-#       - "5433:5432"
-#     volumes:
-#       - postgres_data:/var/lib/postgresql/data
-
-#   adminer:
-#     image: adminer:latest
-#     container_name: adminer
-#     restart: always
-#     ports:
-#       - "8080:8080"
-#     depends_on:
-#       - postgres
-
-
-# volumes:
-#   postgres_data:
-
-
-# services:
-#   back-end:
-#     build: ./backend
-#     container_name: backend
-#     env_file:
-#       - ./backend/.env
-#     ports:
-#       - "3000:3000"
-#     volumes:
-#       - ./backend:/app
-#       - /app/node_modules
-#     depends_on:
-#       - postgres
-
-#   postgres:
-#     image: postgres:16
-#     container_name: transcendence-db
-#     restart: always
-#     env_file:
-#       - ./backend/.env
-#     ports:
-#       - "5433:5432"
-#     volumes:
-#       - postgres_data:/var/lib/postgresql/data
-
-#   adminer:
-#     image: adminer:latest
-#     container_name: adminer
-#     restart: always
-#     ports:
-#       - "8080:8080"
-#     depends_on:
-#       - postgres
-
-
-# volumes:
-#   postgres_data:
-
-
 services:
+  # --- INFRASTRUCTURE ---
+  vault:
+    image: hashicorp/vault:1.21
+    container_name: vault
+    ports:
+      - "8200:8200"
+    volumes:
+      - ./vault/config.hcl:/vault/config/config.hcl
+      - vault_data:/vault/file
+      - ./vault/scripts:/scripts
+    cap_add:
+      - IPC_LOCK
+    command: server
+    networks:
+      - transcendence_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    ports:
+      - "6379"
+    networks:
+      - transcendence_net
+
   postgres:
     image: postgres:16
     container_name: transcendence
@@ -87,7 +34,8 @@ services:
       - "5433:5432"
     volumes:
       - postgres_micro_data:/var/lib/postgresql/data
-      - ./db/init:/docker-entrypoint-initdb.d
+    networks:
+      - transcendence_net
 
   adminer:
     image: adminer:latest
@@ -97,14 +45,10 @@ services:
       - "8081:8080"
     depends_on:
       - postgres
+    networks:
+      - transcendence_net
 
-  redis:
-    image: redis:7-alpine
-    container_name: redis
-    restart: always
-    ports:
-      - "6379:6379"
-
+  # --- MICROSERVICES ---
   gateway:
     build:
       context: ./micro
@@ -115,6 +59,10 @@ services:
       - "3000:3000"
     env_file:
       - ./micro/apps/gateway/.env
+    networks:
+      - transcendence_net
+    depends_on:
+      - vault
 
   auth:
     build:
@@ -123,24 +71,32 @@ services:
     container_name: auth
     restart: always
     env_file:
-      - ./micro/apps/auth/.env
+     - ./micro/apps/auth/.env
     ports:
       - "3001:3001"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_started
+      vault:
+        condition: service_started
+    networks:
+      - transcendence_net
 
   game:
     build:
       context: ./micro
       dockerfile: ./apps/game/Dockerfile
     container_name: game
-    restart: always
+    restart: on-failure
+    stop_grace_period: 10s
     env_file:
       - ./micro/apps/game/.env
     ports:
-      - "3002:3002"
+      - "3005:3005"
     depends_on:
       - postgres
+    networks:
+      - transcendence_net
 
   friends:
     build:
@@ -154,15 +110,20 @@ services:
       - "3003:3003"
     depends_on:
       - postgres
+    networks:
+      - transcendence_net
 
+  # --- FRONTENDS ---
   frontend:
     build:
-      context: ./front
+      context: ./my-game
       dockerfile: Dockerfile
-    container_name: ziad
+    container_name: front
     ports:
       - "5173:5173"
     restart: always
+    networks:
+      - transcendence_net
 
   ping_game:
     build:
@@ -170,10 +131,46 @@ services:
       dockerfile: Dockerfile
     container_name: game_server
     ports:
-      - "8080:8080"
-      - "5000:5000"
-    environment:
-      - NODE_ENV=development
+      - "8082:8082"
+      - "5001:5001"
+    env_file:
+      - ./ping_game/.env
+    networks:
+      - transcendence_net
 
+  ping_game_solo:
+    build:
+      context: ./ping_game_solo
+      dockerfile: Dockerfile
+    container_name: game_server_solo
+    ports:
+      - "8083:8083"
+      - "5002:5002"
+    env_file:
+      - ./ping_game_solo/.env
+    networks:
+      - transcendence_net
+
+##################################
+  nginx:
+    build: ./nginx
+    container_name: pingpong-nginx
+    ports:
+      - "443:443"
+      - "80:80"
+    depends_on:
+      - gateway
+      - frontend
+    networks:
+      - transcendence_net
+
+#####################################
 volumes:
   postgres_micro_data:
+  vault_data:
+
+networks:
+  transcendence_net:
+    driver: bridge
+
+

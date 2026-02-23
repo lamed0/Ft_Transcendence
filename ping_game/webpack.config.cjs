@@ -4,7 +4,15 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 const appDirectory = fs.realpathSync(process.cwd());
 
 // const settings = require(path.resolve(appDirectory, 'src/utils/constant.js'));
+// disable hot module to prevent reload problem in front
 module.exports = {
+    // devServer: {
+    //     hot: false,
+    //     liveReload: false, // optional, disables full page reloads too
+    // },
+    devServer: {
+    client: { webSocketURL: 'ws://localhost:8082/ws' }
+    },
     cache: {
     type: 'filesystem', // Stores cache on disk for faster restarts
     },
@@ -16,7 +24,11 @@ module.exports = {
     resolve: {
         extensions: [".tsx", ".ts", ".js"],
     },
-
+    devtool: 'source-map', // Use a standard source map
+        output: {
+        // This forces webpack to use absolute paths that the browser can resolve
+        devtoolModuleFilenameTemplate: 'file:///[absolute-resource-path]'
+    },
     module: {
         rules: [
             {

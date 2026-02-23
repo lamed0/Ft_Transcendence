@@ -2,8 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { AuthDatabaseService } from './auth-database.service';
+import { PrismaService } from './prisma/prisma.service';
 import { MailService } from '../../../apps/mail/src/mail.service';
+//heeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeere
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -20,7 +21,7 @@ describe('AuthService', () => {
           },
         },
         {
-          provide: AuthDatabaseService,
+          provide: PrismaService,
           useValue: {
             users: {
               findUnique: jest.fn(),

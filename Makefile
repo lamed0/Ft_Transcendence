@@ -9,6 +9,7 @@ all: up
 # Build and start containers in the foreground
 up:
 	@$(DOCKER_COMPOSE) up
+# 	@$(DOCKER_COMPOSE) up
 
 build: 
 	@$(DOCKER_COMPOSE) build

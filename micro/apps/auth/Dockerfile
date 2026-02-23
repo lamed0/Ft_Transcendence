@@ -1,25 +1,24 @@
 FROM node:20-bullseye
 
-# Set working directory to match the monorepo root (micro folder)
 WORKDIR /app
 
-# Copy the entire workspace
 COPY . .
 
-# Install dependencies
-RUN npm install
+# Install all dependencies with --legacy-peer-deps for swagger compatibility with NestJS 11
+RUN npm install --legacy-peer-deps
 
-# Install Prisma CLI v5 globally for team access
+# Install global tools
 RUN npm install -g prisma@5
 
-# Generate Prisma client
 RUN npx prisma generate --schema=./apps/auth/prisma/schema.prisma
 
-# Build the auth application
 RUN npm run build -- auth
 
-# Expose port 3001 for auth service
+# Copy entrypoint script for migrations at startup
+COPY ./apps/auth/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 EXPOSE 3001
 
-# Start the auth service with migrations
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=./apps/auth/prisma/schema.prisma && node dist/apps/auth/main.js"]
+# Run migrations at startup with real DATABASE_URL, then start app
+CMD ["/app/entrypoint.sh"]

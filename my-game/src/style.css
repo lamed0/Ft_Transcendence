@@ -1,0 +1,18 @@
+/* 1. Import all fonts at the very top */
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@900&family=Inter:wght@400;700&family=Press+Start+2P&display=swap');
+
+@import "tailwindcss";
+/* 2. Standard Tailwind v4 import */
+
+/* 3. Your theme configuration */
+@theme {
+  --font-pixel: "Press Start 2P", cursive;
+  --font-tight: "Inter Tight", sans-serif;
+  --font-inter: "Inter", sans-serif;
+}
+
+@layer components {
+  .nav-item {
+    @apply block ml-[25px] text-[20px] font-pixel float-left ;
+  }
+}
